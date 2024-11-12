@@ -6,7 +6,7 @@ This document defines how to describe Kafka-specific information on AsyncAPI.
 
 ## Version
 
-Current version is `0.4.0`.
+Current version is `0.5.0`.
 
 
 <a name="server"></a>
@@ -32,7 +32,7 @@ servers:
       kafka:
         schemaRegistryUrl: 'https://my-schema-registry.com'
         schemaRegistryVendor: 'confluent'
-        bindingVersion: '0.4.0'
+        bindingVersion: '0.5.0'
 ```
 
 
@@ -57,8 +57,6 @@ This object MUST contain only the properties defined above.
 
 ##### Example
 
-This example is valid for any Confluent compatible schema registry. Here we describe the implementation using the first 4 bytes in payload to store schema identifier.
-
 ```yaml
 channels:
   user-signedup:
@@ -73,7 +71,7 @@ channels:
           retention.bytes: 1000000000
           delete.retention.ms: 86400000
           max.message.bytes: 1048588
-        bindingVersion: '0.4.0'
+        bindingVersion: '0.5.0'
 ```
 <a name="topicConfiguration"></a>
 ## TopicConfiguration Object
@@ -83,12 +81,16 @@ This objects contains information about the API relevant topic configuration in 
 Field Name |  Type   |                                                                             Description                                                                              | Applicability [default] | Constraints
 ---|:-------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-----------------------:|---
 <a name="topicConfigurationCleanupPolicy"></a>`cleanup.policy` |  array  |                            The [`cleanup.policy`](https://kafka.apache.org/documentation/#topicconfigs_cleanup.policy) configuration option.                          |        OPTIONAL         | array may only contain `delete` and/or `compact`
-<a name="topicConfigurationRetentionMs"></a>`retention.ms` | integer |                               The [`retention.ms`](https://kafka.apache.org/documentation/#topicconfigs_retention.ms) configuration option.                                    |        OPTIONAL         | see kafka documentation
-<a name="topicConfigurationRetentionBytes"></a>`retention.bytes` | integer |                       The [`retention.bytes`](https://kafka.apache.org/documentation/#topicconfigs_retention.bytes) configuration option.                                                           |        OPTIONAL         | see kafka documentation
-<a name="topicConfigurationDeleteRetentionBytes"></a>`delete.retention.ms` | integer |             The [`delete.retention.ms`](https://kafka.apache.org/documentation/#topicconfigs_delete.retention.ms) configuration option.                                               |        OPTIONAL         | see kafka documentation
+<a name="topicConfigurationRetentionMs"></a>`retention.ms` | long |                               The [`retention.ms`](https://kafka.apache.org/documentation/#topicconfigs_retention.ms) configuration option.                                    |        OPTIONAL         | see kafka documentation
+<a name="topicConfigurationRetentionBytes"></a>`retention.bytes` | long |                       The [`retention.bytes`](https://kafka.apache.org/documentation/#topicconfigs_retention.bytes) configuration option.                                                           |        OPTIONAL         | see kafka documentation
+<a name="topicConfigurationDeleteRetentionBytes"></a>`delete.retention.ms` | long |             The [`delete.retention.ms`](https://kafka.apache.org/documentation/#topicconfigs_delete.retention.ms) configuration option.                                               |        OPTIONAL         | see kafka documentation
 <a name="topicConfigurationMaxMessageBytes"></a>`max.message.bytes` | integer |                    The [`max.message.bytes`](https://kafka.apache.org/documentation/#topicconfigs_max.message.bytes) configuration option.                                      |        OPTIONAL         | see kafka documentation
+<a name="topicConfigurationConfluentKeySchemaValidation"></a>`confluent.key.schema.validation`  | boolean |                    It shows whether the schema validation for the message key is enabled. Vendor specific config.                                      |        OPTIONAL         | -
+<a name="topicConfigurationConfluentKeySubjectNameStrategy"></a>`confluent.key.subject.name.strategy` | string |                    The name of the schema lookup strategy for the message key. Vendor specific config.                                     |        OPTIONAL         | Clients should default to the vendor default if not supplied.
+<a name="topicConfigurationConfluentValueSchemaValidation"></a>`confluent.value.schema.validation` | boolean |                    It shows whether the schema validation for the message value is enabled. Vendor specific config.                                      |        OPTIONAL         | -
+<a name="topicConfigurationConfluentValueSubjectNameStrategy"></a>`confluent.value.subject.name.strategy` | string |                    The name of the schema lookup strategy for the message value. Vendor specific config.                                      |        OPTIONAL         | Clients should default to the vendor default if not supplied.
 
-This object MUST contain only the properties defined above.
+This object MAY contain the properties defined above including optional additional properties.
 
 ##### Example
 
@@ -99,6 +101,10 @@ topicConfiguration:
   retention.bytes: 1000000000
   delete.retention.ms: 86400000
   max.message.bytes: 1048588
+  confluent.key.schema.validation: true
+  confluent.key.subject.name.strategy: "TopicNameStrategy"
+  confluent.value.schema.validation: true
+  confluent.value.subject.name.strategy: "TopicNameStrategy"
 ```
 
 <a name="operation"></a>
@@ -111,8 +117,8 @@ This object contains information about the operation representation in Kafka (eg
 
 Field Name | Type | Description | Applicability [default] | Constraints
 ---|:---:|:---:|:---:|---
-<a name="operationBindingObjectGroupId"></a>`groupId` | [Schema Object][schemaObject] | Id of the consumer group. | OPTIONAL | -
-<a name="operationBindingObjectClientId"></a>`clientId` | [Schema Object][schemaObject] | Id of the consumer inside a consumer group. | OPTIONAL | -
+<a name="operationBindingObjectGroupId"></a>`groupId` | [Schema Object][schemaObject] \| [Reference Object](referenceObject) | Id of the consumer group. | OPTIONAL | -
+<a name="operationBindingObjectClientId"></a>`clientId` | [Schema Object][schemaObject] \| [Reference Object](referenceObject) | Id of the consumer inside a consumer group. | OPTIONAL | -
 <a name="operationBindingObjectBindingVersion"></a>`bindingVersion` | string | The version of this binding. If omitted, "latest" MUST be assumed. | OPTIONAL [`latest`] | -
 
 This object MUST contain only the properties defined above.
@@ -122,16 +128,18 @@ This object MUST contain only the properties defined above.
 ```yaml
 channels:
   user-signedup:
-    subscribe:
-      bindings:
-        kafka:
-          groupId:
-            type: string
-            enum: ['myGroupId']
-          clientId:
-            type: string
-            enum: ['myClientId']
-          bindingVersion: '0.4.0'
+operations:
+  userSignup:
+    action: receive
+    bindings:
+      kafka:
+        groupId:
+          type: string
+          enum: ['myGroupId']
+        clientId:
+          type: string
+          enum: ['myClientId']
+        bindingVersion: '0.5.0'
 ```
 
 
@@ -143,13 +151,13 @@ This object contains information about the message representation in Kafka.
 
 ##### Fixed Fields
 
-Field Name | Type | Description
----|:---:|---
-<a name="messageBindingObjectKey"></a>`key` | [Schema Object][schemaObject] \| [AVRO Schema Object](https://avro.apache.org/docs/current/spec.html) | The message key. **NOTE**: You can also use the [reference object](https://asyncapi.io/docs/specifications/v2.4.0#referenceObject) way.
+Field Name |  Type   |                                                                             Description                                                                              | Applicability [default] | Constraints
+---|:-------:|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-----------------------:|---
+<a name="messageBindingObjectKey"></a>`key` | [Schema Object][schemaObject] \| [Reference Object](referenceObject) \| [AVRO Schema Object](https://avro.apache.org/docs/current/spec.html) | The message key. **NOTE**: You can also use the [reference object](referenceObject) way. | OPTIONAL | -
 <a name="messageBindingObjectSchemaIdLocation"></a>`schemaIdLocation` | string | If a Schema Registry is used when performing this operation, tells where the id of schema is stored (e.g. `header` or `payload`). | OPTIONAL | MUST NOT be specified if `schemaRegistryUrl` is not specified at the Server level
 <a name="messageBindingObjectSchemaIdPayloadEncoding"></a>`schemaIdPayloadEncoding` | string | Number of bytes or vendor specific values when schema id is encoded in payload (e.g `confluent`/ `apicurio-legacy` / `apicurio-new`). | OPTIONAL | MUST NOT be specified if `schemaRegistryUrl` is not specified at the Server level
 <a name="messageBindingObjectSchemaLookupStrategy"></a>`schemaLookupStrategy` | string | Freeform string for any naming strategy class to use. Clients should default to the vendor default if not supplied. | OPTIONAL | MUST NOT be specified if `schemaRegistryUrl` is not specified at the Server level
-<a name="messageBindingObjectBindingVersion"></a>`bindingVersion` | string | The version of this binding. If omitted, "latest" MUST be assumed.
+<a name="messageBindingObjectBindingVersion"></a>`bindingVersion` | string | The version of this binding. If omitted, "latest" MUST be assumed. | OPTIONAL [`latest`] | -
 
 This object MUST contain only the properties defined above.
 
@@ -158,8 +166,9 @@ This example is valid for any Confluent compatible schema registry. Here we desc
 ```yaml
 channels:
   test:
-    publish:
-      message:
+    address: test-topic
+    messages:
+      testMessage:
         bindings:
           kafka:
             key:
@@ -167,7 +176,7 @@ channels:
               enum: ['myKey']
             schemaIdLocation: 'payload'
             schemaIdPayloadEncoding: '4'
-            bindingVersion: '0.4.0'
+            bindingVersion: '0.5.0'
 ```
 
 This is another example that describes the use if Apicurio schema registry. We describe the `apicurio-new` way of serializing without details on how it's implemented. We reference a [specific lookup strategy](https://www.apicur.io/registry/docs/apicurio-registry/2.2.x/getting-started/assembly-using-kafka-client-serdes.html#registry-serdes-concepts-strategy_registry) that may be used to retrieve schema Id from registry during serialization.
@@ -175,8 +184,9 @@ This is another example that describes the use if Apicurio schema registry. We d
 ```yaml
 channels:
   test:
-    publish:
-      message:
+    address: test-topic
+    messages:
+      testMessage:
         bindings:
           kafka:
             key:
@@ -185,7 +195,8 @@ channels:
             schemaIdLocation: 'payload'
             schemaIdPayloadEncoding: 'apicurio-new'
             schemaLookupStrategy: 'TopicIdStrategy'
-            bindingVersion: '0.4.0'
+            bindingVersion: '0.5.0'
 ```
 
-[schemaObject]: https://www.asyncapi.com/docs/specifications/2.4.0/#schemaObject
+[schemaObject]: https://www.asyncapi.com/docs/reference/specification/v3.0.0-next-major-spec.15#schemaObject
+[referenceObject]: https://www.asyncapi.com/docs/reference/specification/v3.0.0-next-major-spec.15#referenceObject
